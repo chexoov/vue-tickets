@@ -1,4 +1,5 @@
 <template>
+  <LangChanger />
   <CreateModal />
   <div>
     <div class="example-input">
@@ -6,15 +7,19 @@
         v-model="serchInput"
         class="input-serch"
         suffix-icon="Search"
-        placeholder="Поиск (№ номер заявки, название)"
+        :placeholder="$t('table.serch.search_applicant')"
         @input="debouncedGetSerchInfo"
       />
-      <el-select v-model="selectHome" placeholder="Дом">
+      <el-select
+        v-model="selectHome"
+        :placeholder="$t('table.serch.search_house')"
+      >
         <el-option
-          v-for="item in getSelectInfo"
+        v-for="item in allHome"
+        @click="getSerchInfoSelect(item.id)"
           :key="item"
           :label="item.address"
-          :value="item.address"
+          :value="item.id"
         />
       </el-select>
     </div>
@@ -26,20 +31,29 @@
           <el-button type="primary">{{ scope.row.number }}</el-button></template
         >
       </el-table-column>
-      <el-table-column prop="status_log.created_at" label="Создан" />
-      <el-table-column prop="premise.full_address" label="Адрес" />
+      <el-table-column prop="created_at" :label="$t('table.headers.created')" />
       <el-table-column
-        prop="premise.manage_organization.name"
-        label="Заявитель"
+        prop="premise.address"
+        :label="$t('table.headers.address')"
       />
-      <el-table-column prop="description" label="Описание" />
-      <el-table-column prop="status.full_details" label="Срок" />
-      <el-table-column prop="status.name" label="Статус" />
+      <el-table-column
+        prop="applicant.first_name"
+        :label="$t('table.headers.applicant')"
+      />
+      <el-table-column
+        prop="description"
+        :label="$t('table.headers.description')"
+      />
+      <el-table-column
+        prop="status.full_details"
+        :label="$t('table.headers.term')"
+      />
+      <el-table-column prop="status.name" :label="$t('table.headers.status')" />
       <el-table-column>
         <template #default="scope">
-          <el-button type="danger" @click="openEditingDialog(scope.row)"
-            >Редактировать</el-button
-          >
+          <el-button type="danger" @click="openEditingDialog(scope.row)">{{
+            $t("table.button.edit")
+          }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -81,6 +95,7 @@ import { computed, ref } from "vue";
 import CreateModal from "./CreateModal.vue";
 import EditModal from "./EditModal.vue";
 import debounce from "lodash/debounce";
+import LangChanger from "./LangChanger.vue";
 
 import { useListData } from "../stores/ListData";
 import { getHello, getDefault } from "../helpers";
@@ -90,7 +105,7 @@ import api from "../api";
 api.tickets.getTickets(1, 10).then((data) => {
   tableData.value = data.data.results;
   pageAmount.value = data.data.pages;
-  // console.log("res", res);
+  console.log("data", data);
 });
 
 console.log("getHello()", getHello());
@@ -161,63 +176,78 @@ const closeEditingDialog = () => {
   dialogVisibleEdit.value = false;
 };
 
+
+const resizeTable = () => {
+  getInfo(1, selectSize.value);
+};
+
+const handleCurrentChange = (val: number) => {
+  getInfo(val, selectSize.value);
+  console.log(`current page: ${val}`);
+};
+
 // основная таблица
 const tableData = ref([]);
 const getInfo = async (currentPage = 1, currentSize = 10) => {
   api.tickets.getTickets(currentPage, currentSize).then((data) => {
     tableData.value = data.data.results;
     pageAmount.value = data.data.pages;
-  })
-  console.log(data);
-  normalizeDate();
+    console.log("logo", tableData.value);
+    normalizeDate();
+  });
 };
 getInfo();
-
-// пагинация
-const handleCurrentChange = (val: number, size: number) => {
-  getInfo(val, size);
-  console.log(`current page: ${val}`);
-};
-
-const resizeTable = () => {
-  getInfo(1, selectSize.value);
-};
 
 // инпут поиска
 const getSerchInfo = async (currentSearch = "") => {
   if (currentSearch === "") {
-    getInfo()
+    getInfo();
     return;
   }
-  currentSearch = serchInput.value;
-  const token = localStorage.getItem("jwt");
-  const { data } = await axios.get(
-    `https://dev.moydomonline.ru/api/appeals/v1.0/appeals?search=${currentSearch}`,
-    {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    }
-  );
-  tableData.value = data.results;
+  api.tickets.searchTicket(currentSearch).then((data) => {
+    tableData.value = data.data.results;
+  });
+};
+
+// селект поиска
+const getSerchInfoSelect = async (currentSearch = "") => {
+  if (currentSearch === "") {
+    getInfo();
+    return;
+  }
+  api.tickets.searchHuse(currentSearch).then((data) => {
+    tableData.value = data.data.results;
+    console.log("serchSelect", data.data.results);
+  });
 };
 
 const debouncedGetSerchInfo = debounce(getSerchInfo, 1000);
 
-const getSelectInfo = computed(() => {
-  const res = tableData.value.map((item: any) => {
-    return item;
+// const getSelectInfo = computed(() => {
+//   const res = tableData.value.map((item: any) => {
+//     return item;
+//   });
+//   console.log("все данные", res);
+//   return res;
+// });
+
+const allHome = ref([]);
+const getPremise = async () => {
+  api.tickets.getPremise().then((data) => {
+    allHome.value = data.data.results;
+    console.log("allHome", allHome.value);
   });
-  console.log("все данные", res);
-  return res;
-});
+};
+getPremise();
+
+
 // нормализация даты в таблице
 const normalizeDate = () => {
   tableData.value.forEach((item: any) => {
-    item.status_log.created_at = new Date(
-      item.status_log.created_at
-    ).toLocaleDateString();
+    item.created_at = new Date(item.created_at).toLocaleDateString();
+    console.log("time", item.created_at);
   });
+
 };
 </script>
 
@@ -228,25 +258,6 @@ const normalizeDate = () => {
   .input-serch {
     padding-right: 15px;
   }
-}
-
-.dialog-content-header {
-  display: flex;
-  padding: 5px;
-  justify-content: space-between;
-  .dialog-content-header-item {
-    border: none;
-    padding: 0px 8px;
-  }
-}
-
-.dialog-content-textarea {
-  resize: none;
-  opacity: 0.5;
-  outline: none;
-  padding-top: 20px;
-  border: none;
-  border-bottom: 2px solid #ccc;
 }
 
 .el-table {

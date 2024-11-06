@@ -89,6 +89,8 @@ import axios from "axios";
 import { computed, ref, toRefs,  } from "vue";
 import { useListData } from "../stores/ListData";
 
+import api from "../api";
+
 
 const props = defineProps({
     openDialog: {
@@ -144,34 +146,18 @@ getTicketFromStore()
 const tableData = ref([]);
 
 const getPremise = async () => {
-  const token = localStorage.getItem("jwt");
-  const { data } = await axios.get(
-    `https://dev.moydomonline.ru/api/geo/v2.0/user-premises/?search=`,
-    {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    }
-  );
-  console.log(data);
-  tableData.value = data.results;
+  api.tickets.getPremise().then((data) => {
+    tableData.value = data.data.results;
+  })
 };
 getPremise()
 
+// !!
 const patchEdit = async () => {
   try {
-    const token = localStorage.getItem("jwt");
-    const { data } = await axios.patch(
-      `https://dev.moydomonline.ru/api/appeals/v1.0/appeals/${newEditing.value.id}/`,
-      newEditing.value,
-      {
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-      }
-    );
-    console.log("успешно", newEditing.value);
-    
+    api.tickets.updateTicket(newEditing.value.id, newEditing.value).then((data) => {
+      console.log("успешно", data);
+    });
   } catch (error) {
     console.error("Ошибка отправки данных:", error);
   }
@@ -181,18 +167,9 @@ const patchEdit = async () => {
 const currentPremise = ref("");
 const getNumberHome = ref([]);
 const getApartment = async () => {
-  const token = localStorage.getItem("jwt");
-  const { data } = await axios.get(
-    `https://dev.moydomonline.ru/api/geo/v1.0/apartments/?premise_id=${currentPremise.value}&search= `,
-    {
-      headers: {
-        Authorization: `Token ${token}`,
-      },
-    }
-  );
-  getNumberHome.value = data.results;
-  console.log("number",getNumberHome.value);
-  console.log("currentPremise",currentPremise.value);
+  api.tickets.getApartments(currentPremise.value).then((data) => {
+    getNumberHome.value = data.data.results;
+  })
 };
 
 const getSelectInfo = computed(() => {
@@ -219,5 +196,24 @@ const handleChange = () => {
 </script>
 
 <style lang="scss">
+
+.dialog-content-header {
+  display: flex;
+  padding: 5px;
+  justify-content: space-between;
+  .dialog-content-header-item {
+    border: none;
+    padding: 0px 8px;
+  }
+}
+
+.dialog-content-textarea {
+  resize: none;
+  opacity: 0.5;
+  outline: none;
+  padding-top: 20px;
+  border: none;
+  border-bottom: 2px solid #ccc;
+}
 
 </style>
